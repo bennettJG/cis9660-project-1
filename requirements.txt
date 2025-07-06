@@ -3,7 +3,6 @@ numpy
 matplotlib
 seaborn
 datetime
-json
 io
 os
 glob
