@@ -3,7 +3,6 @@ numpy
 matplotlib
 seaborn
 datetime
-glob
 plotly
 wquantiles
 scikit-learn
