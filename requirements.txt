@@ -3,7 +3,6 @@ numpy
 matplotlib
 seaborn
 datetime
-io
 os
 glob
 plotly
