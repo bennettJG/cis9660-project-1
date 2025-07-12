@@ -1,0 +1,6 @@
+[theme]
+base="light"
+backgroundColor="ghostWhite"
+secondaryBackgroundColor="lightblue"
+primaryColor="teal"
+textColor="darkslategray"

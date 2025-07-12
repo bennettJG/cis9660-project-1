@@ -10,11 +10,21 @@ import streamlit as st
 import plotly.express as px
 import utils.data_processing
 import weighted # from wquantiles
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
 import math, re
 
 random_state = 1701
 
+css = '''
+<style>
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+    font-size:2rem;
+    padding-right: 20px;
+    }
+</style>
+'''
+
+st.markdown(css, unsafe_allow_html=True)
 # NYC geojson from https://www.kaggle.com/datasets/saidakbarp/nyc-zipcode-geodata
 
 st.set_page_config(page_title="NYC Rental Listings Dashboard", layout="wide")
@@ -23,13 +33,14 @@ raw_data, census_data = utils.data_processing.load_data()
 scaler, X_train, X_test, y_train, y_test = utils.data_processing.process_data(raw_data)
 rf_model = utils.data_processing.train_model(X_train, y_train)
 
-with open('nyc_zcta.geojson') as fp:
+with open('data/nyc_zcta.geojson') as fp:
     zipcodes = json.load(fp)
 
 tab1, tab2, tab3 = st.tabs(["Predict apartment rent", "Explore by ZIP code", "Explore by apartment characteristics"])
 with tab1:
     st.markdown("# Predict apartment rent")
     st.markdown("#### Apartment attributes:")
+    #st.dataframe(raw_data)
     col1, col2, col3 = st.columns(3)
     with col1:
         beds_input = st.slider(
@@ -48,7 +59,8 @@ with tab1:
         )
     with col2:
         zip_input = st.selectbox("ZIP code", 
-            raw_data['zip_code'].dropna().sort_values().unique()
+            census_data['zip code tabulation area'].dropna().sort_values().unique(),
+            index=65
             )
         style_input = st.selectbox("Style", 
             raw_data['style'].dropna().sort_values().unique()
@@ -74,24 +86,38 @@ with tab1:
         'style':style_input, 'sqft':sqft_input,
         'building_age':bldgage_input}, index=[0]), area_data.reset_index()], axis=1).drop(
         ['index', 'zip code tabulation area', 'zip'], axis=1)
-    dummies_regex = re.compile("style|borough.*")
-    dummies = list(filter(dummies_regex.match, X_train.columns))
-    input_data[dummies] = [False]*len(dummies)
-    if (input_data['style'][0] != "APARTMENT"):
-        input_data['style_'+input_data['style'][0]] = True
-    if (input_data['borough'][0] != "Bronx"):
-        input_data['borough_'+input_data['borough'][0]] = True
-    #st.dataframe(input_data)
+
     numeric_columns = ['beds', 'baths', 'building_age', 'area_vacancies', 'area_pop',	'med_income', 'avg_commute', 'sqft', 'med_age']
-    input_processed = pd.concat(
-        [pd.DataFrame(scaler.transform(input_data[numeric_columns]), columns=numeric_columns, index=input_data.index),
-        input_data[dummies]],
-        axis=1
-    )
+    input_processed = scaler.transform(input_data)
+    #st.dataframe(input_processed)
     predicted_rent = math.exp(rf_model.predict(input_processed)[0])
     st.markdown("# Predicted Rent:")
-    st.success(f"${predicted_rent:,.2f} / month")
+    st.success(f"${predicted_rent:,.2f} / month"+"\n===", width = 800)
     
+    st.markdown("---")
+    st.header("About the model")
+    col1, col2 = st.columns(2)
+    with col1:
+        mse, rmse, mae, r2 = utils.data_processing.get_metrics(rf_model, X_test, y_test)
+        st.markdown("### Performance on test set:")
+        st.markdown(f"**Root Mean Squared Error: {rmse:,.4f}**")
+        st.markdown(f"**Mean Squared Error: {mse:,.4f}**")
+        st.markdown(f"**Mean Absolute Error: {mae:,.4f}**")
+        st.markdown(f"**R-squared: {r2:,.4f}**")
+    with col2:
+        st.markdown("### Top Features")
+        topfeatures = pd.Series(abs(rf_model.feature_importances_), index=X_train.columns)
+        topfeatures = topfeatures.sort_values(ascending=False).head(10).reset_index()
+        topfeatures.replace({'index':{'pca0':'Overall size (size component 0)',
+            'pca1':'Rooms other than beds/baths (size component 1)', 'avg_commute':'Average commute time (ZIP code)', 
+            'med_income':'Median household income (ZIP code)', 'building_age':'Building age',
+            'med_age':'Median resident age (ZIP code)', 
+            'area_vacancies':'Vacant housing units (ZIP code)', 'area_pop':'Population (ZIP code)',
+            'style_CONDOS':'Unit is a condo', 'style_SINGLE_FAMILY':'Unit is a single-family dwelling'}},
+            inplace=True)
+        topfeatures.columns = ["Feature", "Importance Score"]
+        st.dataframe(topfeatures)
+        
 with tab2:
     st.markdown("# Explore by ZIP code")
     st.markdown("#### Plot controls")
