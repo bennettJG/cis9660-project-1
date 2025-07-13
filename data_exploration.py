@@ -31,7 +31,7 @@ st.set_page_config(page_title="NYC Rental Listings Dashboard", layout="wide")
 
 raw_data, census_data = utils.data_processing.load_data()
 scaler, X_train, X_test, y_train, y_test = utils.data_processing.process_data(raw_data)
-rf_model = utils.data_processing.train_model(X_train, y_train)
+model = utils.data_processing.train_model(X_train, y_train)
 
 with open('data/nyc_zcta.geojson') as fp:
     zipcodes = json.load(fp)
@@ -90,7 +90,7 @@ with tab1:
     numeric_columns = ['beds', 'baths', 'building_age', 'area_vacancies', 'area_pop',	'med_income', 'avg_commute', 'sqft', 'med_age']
     input_processed = scaler.transform(input_data)
     #st.dataframe(input_processed)
-    predicted_rent = math.exp(rf_model.predict(input_processed)[0])
+    predicted_rent = math.exp(model.predict(input_processed)[0])
     st.markdown("# Predicted Rent:")
     st.success(f"${predicted_rent:,.2f} / month"+"\n===", width = 800)
     
@@ -98,7 +98,7 @@ with tab1:
     st.header("About the model")
     col1, col2 = st.columns(2)
     with col1:
-        mse, rmse, mae, r2 = utils.data_processing.get_metrics(rf_model, X_test, y_test)
+        mse, rmse, mae, r2 = utils.data_processing.get_metrics(model, X_test, y_test)
         st.markdown("### Performance on test set:")
         st.markdown(f"**Root Mean Squared Error: {rmse:,.4f}**")
         st.markdown(f"**Mean Squared Error: {mse:,.4f}**")
@@ -106,12 +106,13 @@ with tab1:
         st.markdown(f"**R-squared: {r2:,.4f}**")
     with col2:
         st.markdown("### Top Features")
-        topfeatures = pd.Series(abs(rf_model.feature_importances_), index=X_train.columns)
+        topfeatures = pd.Series(abs(model.feature_importances_), index=X_train.columns)
         topfeatures = topfeatures.sort_values(ascending=False).head(10).reset_index()
-        topfeatures.replace({'index':{'pca0':'Overall size (size component 0)',
-            'pca1':'Rooms other than beds/baths (size component 1)', 'avg_commute':'Average commute time (ZIP code)', 
+        topfeatures.replace({'index':{'pca0':'Overall size (bedrooms, bathrooms, square footage)',
+            'pca1':'Rooms other than beds/baths', 'avg_commute':'Average commute time (ZIP code)', 
             'med_income':'Median household income (ZIP code)', 'building_age':'Building age',
-            'med_age':'Median resident age (ZIP code)', 
+            'med_age':'Median resident age (ZIP code)', 'borough_Staten Island':'Staten Island',
+            'borough_Queens':'Queens', 'borough_Manhattan':'Manhattan', 'borough_Brooklyn':'Brookyln',
             'area_vacancies':'Vacant housing units (ZIP code)', 'area_pop':'Population (ZIP code)',
             'style_CONDOS':'Unit is a condo', 'style_SINGLE_FAMILY':'Unit is a single-family dwelling'}},
             inplace=True)

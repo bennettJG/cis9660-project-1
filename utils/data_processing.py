@@ -106,9 +106,9 @@ def process_data(rents):
 def train_model(X_train, y_train):
     # Including only the model I ended up choosing here.
     # Other models tested are in the Jupyter notebook.
-    rf_model = RandomForestRegressor(random_state = random_state)
-    rf_model.fit(X_train, y_train)
-    return rf_model
+    model = XGBRegressor()
+    model.fit(X_train, y_train)
+    return model
     
 @st.cache_data
 def get_metrics(_model, X_test, y_test):
